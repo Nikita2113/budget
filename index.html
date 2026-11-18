@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Мой бюджет</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap">
+<style>
+:root{--bg:#eef2f0;--surf:#fff;--ink:#14231f;--mute:#62736d;--line:#d9e2de;--accent:#0f6b57;--accent-ink:#fff;--ok:#1f9a73;--warn:#d9922b;--bad:#d6483f;--track:#e3eae7;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1714;--surf:#16231f;--ink:#e6efeb;--mute:#8fa39b;--line:#25382f;--accent:#3cc29f;--accent-ink:#06211a;--ok:#3cc29f;--warn:#e6a94a;--bad:#ef6b61;--track:#223630;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1714;--surf:#16231f;--ink:#e6efeb;--mute:#8fa39b;--line:#25382f;--accent:#3cc29f;--accent-ink:#06211a;--ok:#3cc29f;--warn:#e6a94a;--bad:#ef6b61;--track:#223630;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 Onest,system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 48px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.01em}
+.month{display:flex;align-items:center;gap:6px;font-weight:600}
+.month button{width:36px;height:36px;border-radius:50%;font-size:18px}
+.month span{min-width:130px;text-align:center}
+button,input,select{font:inherit;color:inherit}
+button{background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:8px 14px;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.ghost{border:0;background:none;color:var(--mute);padding:4px 8px}
+input,select{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-width:0}
+.sum{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surf);border:1px solid var(--line);border-radius:16px;margin-bottom:14px}
+.sum div{padding:12px 14px}
+.sum div+div{border-left:1px solid var(--line)}
+.sum small{display:block;color:var(--mute);font-size:13px}
+.sum b{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.inc{color:var(--ok)}.exp{color:var(--bad)}
+nav{display:flex;gap:4px;background:var(--track);padding:4px;border-radius:12px;margin-bottom:14px}
+nav button{flex:1;border:0;background:none;color:var(--mute);font-weight:600}
+nav button.on{background:var(--surf);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.name{font-weight:600}
+.big{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.bar{height:10px;background:var(--track);border-radius:6px;overflow:hidden;margin:10px 0 8px}
+.bar i{display:block;height:100%;border-radius:6px;background:var(--ok)}
+.st-warn i{background:var(--warn)}.st-bad i{background:var(--bad)}
+.note{color:var(--mute);font-size:14px}
+.over{color:var(--bad);font-weight:600}
+.lim{display:flex;align-items:center;gap:8px;margin-top:6px}
+.lim input{width:110px}
+form{display:flex;flex-wrap:wrap;gap:8px}
+form>*{flex:1 1 130px}
+form .seg{display:flex;gap:6px;flex:1 1 100%}
+form .seg button{flex:1}
+form .seg button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.tx{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.tx:first-child{border-top:0}
+.tx .m{flex:1;min-width:0}
+.tx .m div:first-child{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.amt{font-weight:600;font-variant-numeric:tabular-nums}
+.empty{text-align:center;color:var(--mute);padding:22px 8px}
+h2{font-size:16px;margin:18px 0 8px}
+summary{font-weight:600;cursor:pointer;color:var(--accent)}
+header{flex-wrap:wrap;gap:10px}
+.tb{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:14px}
+.sw{width:34px;height:34px;border-radius:50%;padding:0;border:3px solid var(--surf);box-shadow:0 0 0 1px var(--line)}
+.sw.on{box-shadow:0 0 0 2px var(--accent)}
+.tb input{flex:1 1 160px}
+.emo{font-size:20px;padding:2px 8px;border-radius:10px;background:var(--bg);margin-right:4px}
+.eg{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}
+.eg button{font-size:22px;padding:4px 7px;border-radius:10px;line-height:1.2}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div style="display:flex;align-items:center;gap:8px"><h1 id="ttl">Мой бюджет</h1><button id="tbtn" aria-label="Оформление">🎨</button></div>
+    <div class="month"><button id="prev" aria-label="Предыдущий месяц">‹</button><span id="mlabel"></span><button id="next" aria-label="Следующий месяц">›</button></div>
+  </header>
+  <div id="themebar"></div>
+  <div class="sum" id="sum"></div>
+  <nav id="tabs">
+    <button data-t="limits" class="on">Лимиты</button>
+    <button data-t="tx">Операции</button>
+    <button data-t="goals">Цели</button>
+  </nav>
+  <div id="view"></div>
+</div>
+<script>
+var KEY="budget-v1";
+var eur=new Intl.NumberFormat("ru-RU",{style:"currency",currency:"RUB",minimumFractionDigits:0,maximumFractionDigits:2});
+var $=function(s){return document.querySelector(s)};
+var uid=function(){return Math.random().toString(36).slice(2,9)};
+var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})};
+var today=new Date().toISOString().slice(0,10);
+var DEF=[["Продукты",25000,"🛒"],["Кафе и рестораны",6000,"☕"],["Бензин",8000,"⛽"],["Ремонт и обслуживание авто",5000,"🔧"],["Парковка и мойка",1500,"🅿️"],["Такси и общественный транспорт",3000,"🚕"],["Жильё и коммуналка",10000,"🏠"],["Связь и интернет",1000,"📱"],["Здоровье и аптека",3000,"💊"],["Одежда и обувь",5000,"👗"],["Красота и уход",3000,"💅"],["Развлечения",5000,"🎬"],["Подписки",1000,"📺"],["Подарки",3000,"🎁"],["Прочее",3000,"✨"]];
+var S={cats:DEF.map(function(d,i){return{id:"d"+i,name:d[0],limit:d[1],emo:d[2]}}),tx:[],goals:[]};
+try{var raw=localStorage.getItem(KEY);if(raw){S=JSON.parse(raw)}}catch(e){}
+S.theme=S.theme||"mint";S.title=S.title||"Мой бюджет";
+S.cats.forEach(function(c){if(c.emo===undefined){var d=DEF.filter(function(x){return x[0]===c.name})[0];c.emo=d?d[2]:""}});
+var month=today.slice(0,7),tab="limits",txType="exp",pick="",showTheme=false;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+var MN=["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+function shift(d){var p=month.split("-"),dt=new Date(+p[0],+p[1]-1+d,1);month=dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0");render()}
+function mtx(){return S.tx.filter(function(t){return t.date.slice(0,7)===month})}
+var TH={mint:null,
+pink:{bg:"#fdeef3",surf:"#ffffff",ink:"#3b1626",mute:"#8a6577",line:"#f4d3df",accent:"#d63f7f","accent-ink":"#ffffff",track:"#f8dde7",ok:"#2fa57a",warn:"#d9922b",bad:"#c92a2a"},
+lilac:{bg:"#f3eefb",surf:"#ffffff",ink:"#241938",mute:"#6f6485",line:"#e1d6f3",accent:"#7c4dcc","accent-ink":"#ffffff",track:"#e8def7",ok:"#1f9a73",warn:"#d9922b",bad:"#d6483f"},
+sky:{bg:"#eaf4fb",surf:"#ffffff",ink:"#10283a",mute:"#5b7487",line:"#cfe3f1",accent:"#1f78bd","accent-ink":"#ffffff",track:"#dcebf6",ok:"#1f9a73",warn:"#d9922b",bad:"#d6483f"},
+night:{d:1,bg:"#14101c",surf:"#1e1830",ink:"#f0e9fb",mute:"#a597c0",line:"#322a4a",accent:"#ff7eb6","accent-ink":"#2a0f1c",track:"#2b2340",ok:"#5fd3a6",warn:"#e6a94a",bad:"#ff7b72"}};
+var THN=[["mint","Зелёная","#0f6b57"],["pink","Розовая","#d63f7f"],["lilac","Сиреневая","#7c4dcc"],["sky","Голубая","#1f78bd"],["night","Ночная","#1e1830"]];
+var VARS=["bg","surf","ink","mute","line","accent","accent-ink","track","ok","warn","bad"];
+var EM=["🛒","🍕","☕","🍔","🍣","🥗","🍷","⛽","🚗","🔧","🚕","🚌","✈️","🏖️","🏠","💡","📱","💻","💊","🏥","👗","👟","💅","💄","🎬","🎮","📚","🎵","📺","🎁","🐶","🐱","👶","🧸","🌸","💖","⭐","✨","💰","🏦","🎯","🧾"];
+function applyTheme(){var r=document.documentElement.style,t=TH[S.theme];VARS.forEach(function(k){r.removeProperty("--"+k)});r.colorScheme="";if(t){VARS.forEach(function(k){r.setProperty("--"+k,t[k])});r.colorScheme=t.d?"dark":"light"}}
+function applyTitle(){$("#ttl").textContent=S.title;document.title=S.title}
+function renderThemeBar(){
+  $("#themebar").innerHTML=showTheme?'<div class="tb">'+THN.map(function(t){return '<button class="sw'+(S.theme===t[0]?" on":"")+'" data-th="'+t[0]+'" style="background:'+t[2]+'" aria-label="'+t[1]+'" title="'+t[1]+'"></button>'}).join("")+'<input id="ttlin" value="'+esc(S.title)+'" maxlength="30" aria-label="Название приложения" placeholder="Название приложения"></div>':"";
+}
+function emoBtn(k,id,e){return '<button class="emo" data-pick="'+k+':'+id+'" aria-label="Выбрать смайлик">'+(e||"＋")+'</button>'}
+function grid(k,id){if(pick!==k+":"+id)return "";return '<div class="eg">'+EM.map(function(e){return '<button data-emo="'+e+'">'+e+'</button>'}).join("")+'<button data-emo="" class="ghost">Убрать</button></div>'}
+function render(){
+  var p=month.split("-");$("#mlabel").textContent=MN[+p[1]-1]+" "+p[0];
+  var tx=mtx(),inc=0,exp=0;
+  tx.forEach(function(t){t.type==="inc"?inc+=t.amt:exp+=t.amt});
+  var bal=inc-exp;
+  $("#sum").innerHTML='<div><small>Доход</small><b class="inc">'+eur.format(inc)+'</b></div><div><small>Расходы</small><b class="exp">'+eur.format(exp)+'</b></div><div><small>Остаток</small><b style="color:'+(bal<0?"var(--bad)":"inherit")+'">'+eur.format(bal)+'</b></div>';
+  document.querySelectorAll("#tabs button").forEach(function(b){b.classList.toggle("on",b.dataset.t===tab)});
+  $("#view").innerHTML=tab==="limits"?vLimits(tx):tab==="tx"?vTx(tx):vGoals();
+}
+function vLimits(tx){
+  var h='<details class="card add"><summary>＋ Новая категория</summary><form id="fcat" style="margin-top:10px"><input name="e" maxlength="4" placeholder="😊" aria-label="Смайлик" style="flex:0 0 64px;text-align:center"><input name="n" placeholder="Название, например Кафе" required><input name="l" type="number" min="0" step="1" inputmode="decimal" placeholder="Лимит, ₽" required><button class="pri">Добавить</button></form></details>';
+  if(!S.cats.length)h+='<div class="empty">Добавьте первую категорию с лимитом.</div>';
+  S.cats.forEach(function(c){
+    var sp=tx.filter(function(t){return t.type==="exp"&&t.cat===c.id}).reduce(function(a,t){return a+t.amt},0);
+    var pct=c.limit>0?sp/c.limit*100:(sp>0?100:0),cls=pct>100?"st-bad":pct>=80?"st-warn":"";
+    var left=c.limit-sp;
+    var msg=left>=0?'Осталось <b>'+eur.format(left)+'</b>':'<span class="over">Превышено на '+eur.format(-left)+'</span>';
+    h+='<div class="card '+cls+'"><div class="row"><span class="name">'+emoBtn("cat",c.id,c.emo)+esc(c.name)+'</span><button class="ghost" data-del-cat="'+c.id+'" aria-label="Удалить категорию">Удалить</button></div>'
+      +grid("cat",c.id)+'<div class="big">'+eur.format(sp)+' <span class="note" style="font-size:15px;font-weight:400">из '+eur.format(c.limit)+'</span></div>'
+      +'<div class="bar"><i style="width:'+Math.min(pct,100)+'%"></i></div>'
+      +'<div class="row"><span>'+msg+'</span><span class="note">'+Math.round(pct)+'%</span></div>'
+      +'<div class="lim"><label class="note" for="l'+c.id+'">Лимит на месяц</label><input id="l'+c.id+'" type="number" min="0" step="1" inputmode="decimal" value="'+c.limit+'" data-lim="'+c.id+'"></div></div>';
+  });
+  return h;
+}
+function vTx(tx){
+  var opts=S.cats.map(function(c){return '<option value="'+c.id+'">'+(c.emo?c.emo+" ":"")+esc(c.name)+'</option>'}).join("");
+  var h='<div class="card"><form id="ftx"><div class="seg"><button type="button" data-ty="exp" class="'+(txType==="exp"?"on":"")+'">Расход</button><button type="button" data-ty="inc" class="'+(txType==="inc"?"on":"")+'">Доход</button></div>'
+   +'<input name="a" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Сумма, ₽" required>'
+   +(txType==="exp"?'<select name="c" aria-label="Категория">'+opts+'<option value="__new">＋ Новая категория…</option></select><input name="nc" placeholder="Название новой категории" style="display:'+(S.cats.length?'none':'')+'">':'')
+   +'<input name="n" placeholder="Заметка (необязательно)"><input name="d" type="date" value="'+(today.slice(0,7)===month?today:month+"-01")+'" required>'
+   +'<button class="pri" style="flex:1 1 100%">Добавить</button></form></div>';
+  var list=tx.slice().sort(function(a,b){return b.date.localeCompare(a.date)});
+  if(!list.length)return h+'<div class="empty">В этом месяце операций нет. Добавьте первую выше.</div>';
+  h+='<div class="card">';
+  list.forEach(function(t){
+    var c=S.cats.filter(function(x){return x.id===t.cat})[0];
+    var label=t.type==="inc"?"Доход":(c?(c.emo?c.emo+" ":"")+c.name:"Без категории");
+    h+='<div class="tx"><div class="m"><div>'+esc(t.note||label)+'</div><div class="note">'+esc(label)+' · '+t.date.split("-").reverse().join(".")+'</div></div><span class="amt '+(t.type==="inc"?"inc":"exp")+'">'+(t.type==="inc"?"+":"−")+eur.format(t.amt)+'</span><button class="ghost" data-del-tx="'+t.id+'" aria-label="Удалить операцию">✕</button></div>';
+  });
+  return h+'</div>';
+}
+function vGoals(){
+  var h="";
+  if(!S.goals.length)h+='<div class="empty">Целей пока нет. Задайте первую: отпуск, подушка безопасности, техника.</div>';
+  S.goals.forEach(function(g){
+    var pct=g.target>0?Math.min(g.saved/g.target*100,100):0,left=g.target-g.saved;
+    h+='<div class="card"><div class="row"><span class="name">'+emoBtn("goal",g.id,g.emo||"🎯")+esc(g.name)+'</span><button class="ghost" data-del-goal="'+g.id+'" aria-label="Удалить цель">Удалить</button></div>'
+     +grid("goal",g.id)+'<div class="big">'+eur.format(g.saved)+' <span class="note" style="font-size:15px;font-weight:400">из '+eur.format(g.target)+'</span></div>'
+     +'<div class="bar"><i style="width:'+pct+'%"></i></div>'
+     +'<div class="note">'+(left>0?'Осталось накопить '+eur.format(left):'Цель достигнута 🎉')+' · '+Math.round(pct)+'%</div>'
+     +'<form class="fgoal" data-g="'+g.id+'" style="margin-top:10px"><input name="a" type="number" step="0.01" inputmode="decimal" placeholder="Сумма, ₽ (можно отрицательную)" required><button class="pri">Пополнить</button></form></div>';
+  });
+  h+='<h2>Новая цель</h2><div class="card"><form id="fgl"><input name="n" placeholder="Название цели" required><input name="t" type="number" min="1" step="1" inputmode="decimal" placeholder="Сумма цели, ₽" required><button class="pri">Создать</button></form></div>';
+  return h;
+}
+document.addEventListener("click",function(e){
+  var b=e.target.closest("button");if(!b)return;
+  if(b.id==="tbtn"){showTheme=!showTheme;return renderThemeBar()}
+  if(b.dataset.th){S.theme=b.dataset.th;save();applyTheme();return renderThemeBar()}
+  if(b.dataset.pick){pick=pick===b.dataset.pick?"":b.dataset.pick;return render()}
+  if(b.dataset.emo!==undefined){var pp=pick.split(":"),arr=pp[0]==="cat"?S.cats:S.goals,it=arr.filter(function(x){return x.id===pp[1]})[0];if(it)it.emo=b.dataset.emo;pick="";save();return render()}
+  if(b.id==="prev")return shift(-1);
+  if(b.id==="next")return shift(1);
+  if(b.dataset.t){tab=b.dataset.t;return render()}
+  if(b.dataset.ty){txType=b.dataset.ty;return render()}
+  if(b.dataset.delCat){if(confirm("Удалить категорию? Её операции останутся без категории.")){S.cats=S.cats.filter(function(c){return c.id!==b.dataset.delCat});save();render()}return}
+  if(b.dataset.delTx){S.tx=S.tx.filter(function(t){return t.id!==b.dataset.delTx});save();return render()}
+  if(b.dataset.delGoal){if(confirm("Удалить цель?")){S.goals=S.goals.filter(function(g){return g.id!==b.dataset.delGoal});save();render()}}
+});
+document.addEventListener("change",function(e){
+  var i=e.target;if(i.id==="ttlin"){S.title=i.value.trim()||"Мой бюджет";save();applyTitle();return}
+  if(i.name==="c"&&i.form&&i.form.id==="ftx"){i.form.elements.nc.style.display=i.value==="__new"?"":"none";return}
+  if(!i.dataset.lim)return;
+  var c=S.cats.filter(function(x){return x.id===i.dataset.lim})[0];
+  c.limit=Math.max(0,parseFloat(i.value)||0);save();render();
+});
+document.addEventListener("submit",function(e){
+  e.preventDefault();var f=e.target,v=function(n){return f.elements[n]?f.elements[n].value:""};
+  if(f.id==="fcat"){S.cats.push({id:uid(),name:v("n").trim(),limit:parseFloat(v("l"))||0,emo:v("e").trim()})}
+  else if(f.id==="ftx"){var cid=v("c");if(txType==="exp"&&cid==="__new"){var nm=v("nc").trim()||"Новая категория",ex=S.cats.filter(function(c){return c.name.toLowerCase()===nm.toLowerCase()})[0];if(ex){cid=ex.id}else{cid=uid();S.cats.push({id:cid,name:nm,limit:0})}}
+    S.tx.push({id:uid(),type:txType,amt:parseFloat(v("a")),cat:txType==="exp"?cid:"",date:v("d"),note:v("n").trim()});
+    if(v("d").slice(0,7)!==month)month=v("d").slice(0,7)}
+  else if(f.id==="fgl"){S.goals.push({id:uid(),name:v("n").trim(),target:parseFloat(v("t")),saved:0})}
+  else if(f.classList.contains("fgoal")){var g=S.goals.filter(function(x){return x.id===f.dataset.g})[0];g.saved=Math.max(0,g.saved+parseFloat(v("a")))}
+  save();render();
+});
+applyTheme();applyTitle();render();
+</script>
+</body>
+</html>
