@@ -71,7 +71,7 @@ header{flex-wrap:wrap;gap:10px}
 <body>
 <div class="wrap">
   <header>
-    <div style="display:flex;align-items:center;gap:8px"><h1 id="ttl">Мой бюджет</h1><button id="tbtn" aria-label="Оформление">🎨</button></div>
+    <div style="display:flex;align-items:center;gap:8px"><h1 id="ttl">Мой бюджет</h1><button id="tbtn" aria-label="Оформление и общий бюджет">🎨</button><span id="cloud" style="font-size:18px"></span></div>
     <div class="month"><button id="prev" aria-label="Предыдущий месяц">‹</button><span id="mlabel"></span><button id="next" aria-label="Следующий месяц">›</button></div>
   </header>
   <div id="themebar"></div>
@@ -83,6 +83,7 @@ header{flex-wrap:wrap;gap:10px}
   </nav>
   <div id="view"></div>
 </div>
+<script src="firebase-config.js"></script>
 <script>
 var KEY="budget-v1";
 var eur=new Intl.NumberFormat("ru-RU",{style:"currency",currency:"RUB",minimumFractionDigits:0,maximumFractionDigits:2});
@@ -95,8 +96,10 @@ var S={cats:DEF.map(function(d,i){return{id:"d"+i,name:d[0],limit:d[1],emo:d[2]}
 try{var raw=localStorage.getItem(KEY);if(raw){S=JSON.parse(raw)}}catch(e){}
 S.theme=S.theme||"mint";S.title=S.title||"Мой бюджет";
 S.cats.forEach(function(c){if(c.emo===undefined){var d=DEF.filter(function(x){return x[0]===c.name})[0];c.emo=d?d[2]:""}});
+normalize();
 var month=today.slice(0,7),tab="limits",txType="exp",pick="",showTheme=false;
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function saveLocal(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){normalize();saveLocal();syncPush()}
 var MN=["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 function shift(d){var p=month.split("-"),dt=new Date(+p[0],+p[1]-1+d,1);month=dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0");render()}
 function mtx(){return S.tx.filter(function(t){return t.date.slice(0,7)===month})}
@@ -110,11 +113,92 @@ var VARS=["bg","surf","ink","mute","line","accent","accent-ink","track","ok","wa
 var EM=["🛒","🍕","☕","🍔","🍣","🥗","🍷","⛽","🚗","🔧","🚕","🚌","✈️","🏖️","🏠","💡","📱","💻","💊","🏥","👗","👟","💅","💄","🎬","🎮","📚","🎵","📺","🎁","🐶","🐱","👶","🧸","🌸","💖","⭐","✨","💰","🏦","🎯","🧾"];
 function applyTheme(){var r=document.documentElement.style,t=TH[S.theme];VARS.forEach(function(k){r.removeProperty("--"+k)});r.colorScheme="";if(t){VARS.forEach(function(k){r.setProperty("--"+k,t[k])});r.colorScheme=t.d?"dark":"light"}}
 function applyTitle(){$("#ttl").textContent=S.title;document.title=S.title}
+function cloudBox(){
+  var h='<div class="tb"><b style="flex:1 1 100%">Общий бюджет</b>';
+  if(!cfgOk())h+='<span class="note" style="flex:1 1 100%">Не настроен: заполните файл firebase-config.js (инструкция в README).</span>';
+  else if(room)h+='<span class="note" style="flex:1 1 100%">'+esc(sync.msg||"Подключаемся…")+'</span><button data-cloud="off">Отключить</button>';
+  else h+='<input id="phrase" placeholder="Секретное слово или фраза" autocomplete="off"><button class="pri" data-cloud="on">Подключить</button><span class="note" style="flex:1 1 100%">'+esc(sync.msg||"Одинаковое слово на всех устройствах. Минимум 8 символов, лучше 3–4 случайных слова.")+'</span>';
+  return h+'</div>';
+}
 function renderThemeBar(){
-  $("#themebar").innerHTML=showTheme?'<div class="tb">'+THN.map(function(t){return '<button class="sw'+(S.theme===t[0]?" on":"")+'" data-th="'+t[0]+'" style="background:'+t[2]+'" aria-label="'+t[1]+'" title="'+t[1]+'"></button>'}).join("")+'<input id="ttlin" value="'+esc(S.title)+'" maxlength="30" aria-label="Название приложения" placeholder="Название приложения"></div>':"";
+  $("#themebar").innerHTML=showTheme?'<div class="tb">'+THN.map(function(t){return '<button class="sw'+(S.theme===t[0]?" on":"")+'" data-th="'+t[0]+'" style="background:'+t[2]+'" aria-label="'+t[1]+'" title="'+t[1]+'"></button>'}).join("")+'<input id="ttlin" value="'+esc(S.title)+'" maxlength="30" aria-label="Название приложения" placeholder="Название приложения"></div>'+cloudBox():"";
 }
 function emoBtn(k,id,e){return '<button class="emo" data-pick="'+k+':'+id+'" aria-label="Выбрать смайлик">'+(e||"＋")+'</button>'}
 function grid(k,id){if(pick!==k+":"+id)return "";return '<div class="eg">'+EM.map(function(e){return '<button data-emo="'+e+'">'+e+'</button>'}).join("")+'<button data-emo="" class="ghost">Убрать</button></div>'}
+/* ---------- Общий бюджет (Firebase Firestore) ---------- */
+var CFG=window.FIREBASE_CONFIG,COLS=["cats","tx","goals"],room=null;
+try{room=localStorage.getItem("budget-room")}catch(e){}
+var sync={fs:null,ref:null,unsub:null,first:false,last:{cats:{},tx:{},goals:{}},kind:"",msg:"",dirty:false};
+function cfgOk(){return !!(CFG&&CFG.apiKey&&CFG.projectId)}
+function ser(o){return JSON.stringify(o,Object.keys(o).sort())}
+function toMap(a){var m={};a.forEach(function(x){m[x.id]=ser(x)});return m}
+function arr(m,k){var a=[];Object.keys(m).forEach(function(id){try{a.push(JSON.parse(m[id]))}catch(e){}});if(k!=="tx")a.sort(function(x,y){return(x.o||0)-(y.o||0)});return a}
+function normalize(){var n=Date.now();["cats","goals"].forEach(function(k){S[k].forEach(function(x,i){if(x.o==null)x.o=n+i})})}
+function pristine(){return !S.tx.length&&!S.goals.length&&S.cats.length===DEF.length&&S.cats.every(function(c,i){return c.id==="d"+i&&c.name===DEF[i][0]&&c.limit===DEF[i][1]&&c.emo===DEF[i][2]})}
+function typing(){var a=document.activeElement;return !!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)&&$("#view").contains(a))}
+function refresh(){if(typing()){sync.dirty=true}else{sync.dirty=false;render()}}
+document.addEventListener("focusout",function(){setTimeout(function(){if(sync.dirty&&!typing())refresh()},50)});
+function setStatus(kind,msg){
+  if(kind===sync.kind&&(msg||"")===sync.msg)return;
+  sync.kind=kind;sync.msg=msg||"";
+  var c=$("#cloud");if(c){c.textContent=!room?"":kind==="ok"?"☁️":kind==="wait"?"⏳":"⚠️";c.title=sync.msg}
+  if(showTheme)renderThemeBar();
+}
+function syncPush(){
+  if(!sync.fs||!sync.ref||!sync.first)return;
+  var diff={},any=false;
+  COLS.forEach(function(k){
+    var cur=toMap(S[k]),old=sync.last[k],d={},id;
+    for(id in cur)if(cur[id]!==old[id]){d[id]=cur[id];any=true}
+    for(id in old)if(!(id in cur)){d[id]=sync.fs.deleteField();any=true}
+    diff[k]=d;
+  });
+  if(!any)return;
+  COLS.forEach(function(k){sync.last[k]=toMap(S[k])});
+  sync.fs.setDoc(sync.ref,diff,{merge:true}).catch(function(e){setStatus("err","Не удалось отправить данные ("+(e.code||e.message)+")")});
+}
+function onSnap(snap){
+  if(!sync.first&&snap.metadata&&snap.metadata.fromCache){setStatus("wait","Нет связи с сервером, ждём подключения…");return}
+  var d=snap.exists()?snap.data():{},rem={},has=false;
+  COLS.forEach(function(k){rem[k]=d[k]||{};if(Object.keys(rem[k]).length)has=true});
+  if(!sync.first){
+    var take=has&&pristine();
+    COLS.forEach(function(k){
+      var m=Object.assign({},rem[k]);
+      if(!take)S[k].forEach(function(x){if(!(x.id in m))m[x.id]=ser(x)});
+      S[k]=arr(m,k);
+    });
+    sync.last={cats:Object.assign({},rem.cats),tx:Object.assign({},rem.tx),goals:Object.assign({},rem.goals)};
+    sync.first=true;saveLocal();syncPush();
+  }else{
+    COLS.forEach(function(k){S[k]=arr(rem[k],k)});
+    sync.last={cats:Object.assign({},rem.cats),tx:Object.assign({},rem.tx),goals:Object.assign({},rem.goals)};
+    saveLocal();
+  }
+  setStatus("ok","Подключено. Данные общие и обновляются сами.");
+  refresh();
+}
+function stopSync(){if(sync.unsub){try{sync.unsub()}catch(e){}}sync.unsub=null;sync.fs=null;sync.ref=null;sync.first=false}
+async function startSync(id){
+  stopSync();setStatus("wait","Подключаемся…");
+  try{
+    var A=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    var F=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    var app=A.getApps().length?A.getApp():A.initializeApp(CFG);
+    sync.fs=F;sync.ref=F.doc(F.getFirestore(app),"rooms",id);sync.first=false;sync.last={cats:{},tx:{},goals:{}};
+    sync.unsub=F.onSnapshot(sync.ref,{includeMetadataChanges:true},onSnap,function(e){setStatus("err","Нет доступа к базе ("+(e.code||e.message)+"). Проверьте правила Firestore.")});
+  }catch(e){setStatus("err","Не удалось подключиться: "+(e.message||e))}
+}
+async function sha(t){var b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("budget-app:"+t));return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,"0")}).join("")}
+async function connect(raw){
+  if(!cfgOk())return setStatus("err","Сначала заполните firebase-config.js");
+  var p=raw.trim().replace(/\s+/g," ").toLowerCase();
+  if(p.length<8)return setStatus("err","Слишком короткое слово: нужно минимум 8 символов");
+  if(!window.crypto||!crypto.subtle)return setStatus("err","Откройте сайт по https-ссылке (GitHub Pages)");
+  room=await sha(p);
+  try{localStorage.setItem("budget-room",room)}catch(e){}
+  startSync(room);
+}
 function render(){
   var p=month.split("-");$("#mlabel").textContent=MN[+p[1]-1]+" "+p[0];
   var tx=mtx(),inc=0,exp=0;
@@ -174,6 +258,8 @@ function vGoals(){
 document.addEventListener("click",function(e){
   var b=e.target.closest("button");if(!b)return;
   if(b.id==="tbtn"){showTheme=!showTheme;return renderThemeBar()}
+  if(b.dataset.cloud==="on"){var pi=$("#phrase");return connect(pi?pi.value:"")}
+  if(b.dataset.cloud==="off"){if(confirm("Отключить общий бюджет на этом устройстве? Данные здесь останутся, но перестанут синхронизироваться.")){stopSync();room=null;try{localStorage.removeItem("budget-room")}catch(e){}sync.kind="";sync.msg="";$("#cloud").textContent="";renderThemeBar()}return}
   if(b.dataset.th){S.theme=b.dataset.th;save();applyTheme();return renderThemeBar()}
   if(b.dataset.pick){pick=pick===b.dataset.pick?"":b.dataset.pick;return render()}
   if(b.dataset.emo!==undefined){var pp=pick.split(":"),arr=pp[0]==="cat"?S.cats:S.goals,it=arr.filter(function(x){return x.id===pp[1]})[0];if(it)it.emo=b.dataset.emo;pick="";save();return render()}
@@ -203,6 +289,7 @@ document.addEventListener("submit",function(e){
   save();render();
 });
 applyTheme();applyTitle();render();
+if(room&&cfgOk())startSync(room);
 </script>
 </body>
 </html>
