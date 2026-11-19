@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Мой бюджет</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f6b57">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Бюджет">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap">
 <style>
 :root{--bg:#eef2f0;--surf:#fff;--ink:#14231f;--mute:#62736d;--line:#d9e2de;--accent:#0f6b57;--accent-ink:#fff;--ok:#1f9a73;--warn:#d9922b;--bad:#d6483f;--track:#e3eae7;
@@ -335,6 +342,7 @@ document.addEventListener("submit",function(e){
   if(f.id==="fshop"){var ni=document.querySelector("#fshop input");if(ni)ni.focus()}
 });
 applyTheme();applyTitle();render();
+try{if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js")}catch(e){}
 if(room&&cfgOk())startSync(room);
 </script>
 </body>
