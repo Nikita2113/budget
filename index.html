@@ -67,6 +67,17 @@ h2{font-size:16px;margin:18px 0 8px}
 summary{font-weight:600;cursor:pointer;color:var(--accent)}
 header{flex-wrap:wrap;gap:10px}
 nav button{padding:8px 4px;font-size:15px}
+#ttl{touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.ee{position:fixed;inset:0;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+.ee .box{background:var(--surf);border-radius:20px;max-width:560px;width:100%;max-height:100%;overflow:auto;padding:16px}
+.ee h2{margin:4px 0 0;font-size:22px}
+.ee .road{position:relative;height:30px;overflow:hidden;font-size:22px}
+.ee .car{position:absolute;top:0;left:-10%;white-space:nowrap;animation:drive 4s linear infinite}
+@keyframes drive{from{left:-12%}to{left:100%}}
+@media (prefers-reduced-motion:reduce){.ee .car{animation:none;left:40%}}
+.gal{display:grid;grid-template-columns:1fr;gap:8px;margin:12px 0}
+@media (min-width:520px){.gal{grid-template-columns:1fr 1fr}}
+.gal img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;display:block;background:var(--track)}
 .chk{width:28px;height:28px;border-radius:50%;padding:0;flex:none;border:2px solid var(--line);line-height:1}
 .chk.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .tb{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:14px}
@@ -341,6 +352,19 @@ document.addEventListener("submit",function(e){
   save();render();
   if(f.id==="fshop"){var ni=document.querySelector("#fshop input");if(ni)ni.focus()}
 });
+function garage(){
+  if(document.querySelector(".ee"))return;
+  var c=S.cats.filter(function(x){return x.name.toLowerCase()==="бензин"})[0],line="";
+  if(c){var sp=mtx().filter(function(t){return t.type==="exp"&&t.cat===c.id}).reduce(function(a,t){return a+t.amt},0);
+    line='<p style="margin:0 0 12px">Бензин за выбранный месяц: <b>'+eur.format(sp)+'</b>'+(c.limit?' из '+eur.format(c.limit):'')+'. '+(c.limit&&sp>c.limit?'Пора пересесть на велосипед 🚲':'Можно кататься 😎')+'</p>'}
+  var d=document.createElement("div");d.className="ee";
+  d.innerHTML='<div class="box" role="dialog" aria-label="Наш гараж"><div class="road" aria-hidden="true"><span class="car">🚗💨</span></div><h2>Наш гараж</h2><div class="gal"><img src="garage-1.jpg" alt="Серая Лада" style="object-position:50% 60%"><img src="garage-2.jpg" alt="Красный Ford" style="object-position:50% 52%"></div>'+line+'<button class="pri" id="eeclose" style="width:100%">Поехали дальше</button></div>';
+  d.addEventListener("click",function(e){if(e.target===d||e.target.id==="eeclose")d.remove()});
+  document.body.appendChild(d);
+}
+var eeN=0,eeT=0;
+$("#ttl").addEventListener("click",function(){var n=Date.now();eeN=n-eeT<800?eeN+1:1;eeT=n;if(eeN>=5){eeN=0;garage()}});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"){var x=document.querySelector(".ee");if(x)x.remove()}});
 applyTheme();applyTitle();render();
 try{if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js")}catch(e){}
 if(room&&cfgOk())startSync(room);

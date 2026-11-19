@@ -1,7 +1,7 @@
 // Сервис-воркер: приложение открывается и без интернета.
 // Файлы всегда берутся с сервера (так обновления приходят сразу), а при отсутствии связи из кэша.
-var C = "budget-shell-v1";
-var FILES = ["./", "index.html", "firebase-config.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
+var C = "budget-shell-v2";
+var FILES = ["./", "index.html", "firebase-config.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "garage-1.jpg", "garage-2.jpg"];
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(C).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); }));
 });
