@@ -59,6 +59,9 @@ form .seg button.on{background:var(--accent);color:var(--accent-ink);border-colo
 h2{font-size:16px;margin:18px 0 8px}
 summary{font-weight:600;cursor:pointer;color:var(--accent)}
 header{flex-wrap:wrap;gap:10px}
+nav button{padding:8px 4px;font-size:15px}
+.chk{width:28px;height:28px;border-radius:50%;padding:0;flex:none;border:2px solid var(--line);line-height:1}
+.chk.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .tb{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:14px}
 .sw{width:34px;height:34px;border-radius:50%;padding:0;border:3px solid var(--surf);box-shadow:0 0 0 1px var(--line)}
 .sw.on{box-shadow:0 0 0 2px var(--accent)}
@@ -80,6 +83,7 @@ header{flex-wrap:wrap;gap:10px}
     <button data-t="limits" class="on">Лимиты</button>
     <button data-t="tx">Операции</button>
     <button data-t="goals">Цели</button>
+    <button data-t="shop">Покупки</button>
   </nav>
   <div id="view"></div>
 </div>
@@ -94,7 +98,7 @@ var today=new Date().toISOString().slice(0,10);
 var DEF=[["Продукты",25000,"🛒"],["Кафе и рестораны",6000,"☕"],["Бензин",8000,"⛽"],["Ремонт и обслуживание авто",5000,"🔧"],["Парковка и мойка",1500,"🅿️"],["Такси и общественный транспорт",3000,"🚕"],["Жильё и коммуналка",10000,"🏠"],["Связь и интернет",1000,"📱"],["Здоровье и аптека",3000,"💊"],["Одежда и обувь",5000,"👗"],["Красота и уход",3000,"💅"],["Развлечения",5000,"🎬"],["Подписки",1000,"📺"],["Подарки",3000,"🎁"],["Прочее",3000,"✨"]];
 var S={cats:DEF.map(function(d,i){return{id:"d"+i,name:d[0],limit:d[1],emo:d[2]}}),tx:[],goals:[]};
 try{var raw=localStorage.getItem(KEY);if(raw){S=JSON.parse(raw)}}catch(e){}
-S.theme=S.theme||"mint";S.title=S.title||"Мой бюджет";
+S.shop=S.shop||[];S.theme=S.theme||"mint";S.title=S.title||"Мой бюджет";
 S.cats.forEach(function(c){if(c.emo===undefined){var d=DEF.filter(function(x){return x[0]===c.name})[0];c.emo=d?d[2]:""}});
 normalize();
 var month=today.slice(0,7),tab="limits",txType="exp",pick="",showTheme=false;
@@ -126,15 +130,16 @@ function renderThemeBar(){
 function emoBtn(k,id,e){return '<button class="emo" data-pick="'+k+':'+id+'" aria-label="Выбрать смайлик">'+(e||"＋")+'</button>'}
 function grid(k,id){if(pick!==k+":"+id)return "";return '<div class="eg">'+EM.map(function(e){return '<button data-emo="'+e+'">'+e+'</button>'}).join("")+'<button data-emo="" class="ghost">Убрать</button></div>'}
 /* ---------- Общий бюджет (Firebase Firestore) ---------- */
-var CFG=window.FIREBASE_CONFIG,COLS=["cats","tx","goals"],room=null;
+var CFG=window.FIREBASE_CONFIG,COLS=["cats","tx","goals","shop"],room=null;
 try{room=localStorage.getItem("budget-room")}catch(e){}
-var sync={fs:null,ref:null,unsub:null,first:false,last:{cats:{},tx:{},goals:{}},kind:"",msg:"",dirty:false};
+var sync={fs:null,ref:null,unsub:null,first:false,last:lastOf({}),kind:"",msg:"",dirty:false};
+function lastOf(rem){var o={};COLS.forEach(function(k){o[k]=Object.assign({},rem[k]||{})});return o}
 function cfgOk(){return !!(CFG&&CFG.apiKey&&CFG.projectId)}
 function ser(o){return JSON.stringify(o,Object.keys(o).sort())}
 function toMap(a){var m={};a.forEach(function(x){m[x.id]=ser(x)});return m}
 function arr(m,k){var a=[];Object.keys(m).forEach(function(id){try{a.push(JSON.parse(m[id]))}catch(e){}});if(k!=="tx")a.sort(function(x,y){return(x.o||0)-(y.o||0)});return a}
-function normalize(){var n=Date.now();["cats","goals"].forEach(function(k){S[k].forEach(function(x,i){if(x.o==null)x.o=n+i})})}
-function pristine(){return !S.tx.length&&!S.goals.length&&S.cats.length===DEF.length&&S.cats.every(function(c,i){return c.id==="d"+i&&c.name===DEF[i][0]&&c.limit===DEF[i][1]&&c.emo===DEF[i][2]})}
+function normalize(){var n=Date.now();["cats","goals","shop"].forEach(function(k){S[k].forEach(function(x,i){if(x.o==null)x.o=n+i})})}
+function pristine(){return !S.tx.length&&!S.goals.length&&!S.shop.length&&S.cats.length===DEF.length&&S.cats.every(function(c,i){return c.id==="d"+i&&c.name===DEF[i][0]&&c.limit===DEF[i][1]&&c.emo===DEF[i][2]})}
 function typing(){var a=document.activeElement;return !!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)&&$("#view").contains(a))}
 function refresh(){if(typing()){sync.dirty=true}else{sync.dirty=false;render()}}
 document.addEventListener("focusout",function(){setTimeout(function(){if(sync.dirty&&!typing())refresh()},50)});
@@ -169,21 +174,21 @@ function onSnap(snap){
       if(!take)S[k].forEach(function(x){if(!(x.id in m))m[x.id]=ser(x)});
       S[k]=arr(m,k);
     });
-    sync.last={cats:Object.assign({},rem.cats),tx:Object.assign({},rem.tx),goals:Object.assign({},rem.goals)};
+    sync.last=lastOf(rem);
     sync.first=true;saveLocal();syncPush();
   }else{
     if(!has&&S.cats.length+S.tx.length+S.goals.length>0){setStatus("err","Облако пустое, а на устройстве есть данные. Вероятно, нет прав на запись: проверьте правила Firestore. Синхронизация остановлена, данные на устройстве целы.");stopSync();return}
     COLS.forEach(function(k){S[k]=arr(rem[k],k)});
-    sync.last={cats:Object.assign({},rem.cats),tx:Object.assign({},rem.tx),goals:Object.assign({},rem.goals)};
+    sync.last=lastOf(rem);
     saveLocal();
   }
   setStatus("ok","Подключено. Данные общие и обновляются сами.");
   refresh();
 }
-function cnt(o){return o.cats.length+o.tx.length+o.goals.length}
-function backup(){try{var n=cnt(S),prev=0;try{prev=cnt(JSON.parse(localStorage.getItem("budget-backup")).s)}catch(e){}if(n>0&&n>=prev)localStorage.setItem("budget-backup",JSON.stringify({d:Date.now(),s:{cats:S.cats,tx:S.tx,goals:S.goals}}))}catch(e){}}
+function cnt(o){return o.cats.length+o.tx.length+o.goals.length+(o.shop||[]).length}
+function backup(){try{var n=cnt(S),prev=0;try{prev=cnt(JSON.parse(localStorage.getItem("budget-backup")).s)}catch(e){}if(n>0&&n>=prev)localStorage.setItem("budget-backup",JSON.stringify({d:Date.now(),s:{cats:S.cats,tx:S.tx,goals:S.goals,shop:S.shop}}))}catch(e){}}
 function hasBk(){try{return !!localStorage.getItem("budget-backup")}catch(e){return false}}
-function applyData(o){if(!o||!Array.isArray(o.cats)||!Array.isArray(o.tx)||!Array.isArray(o.goals)){alert("Файл не похож на копию бюджета");return}backup();S.cats=o.cats;S.tx=o.tx;S.goals=o.goals;save();render()}
+function applyData(o){if(!o||!Array.isArray(o.cats)||!Array.isArray(o.tx)||!Array.isArray(o.goals)){alert("Файл не похож на копию бюджета");return}backup();S.cats=o.cats;S.tx=o.tx;S.goals=o.goals;S.shop=Array.isArray(o.shop)?o.shop:[];save();render()}
 function bkBox(){return '<div class="tb"><b style="flex:1 1 100%">Резервная копия</b><button data-bk="exp">Сохранить в файл</button><button data-bk="imp">Загрузить из файла</button>'+(hasBk()?'<button data-bk="auto">Восстановить авто-копию</button>':'')+'<input type="file" id="bkfile" accept=".json" style="display:none"></div>'}
 function stopSync(){if(sync.unsub){try{sync.unsub()}catch(e){}}sync.unsub=null;sync.fs=null;sync.ref=null;sync.first=false}
 async function startSync(id){
@@ -192,7 +197,7 @@ async function startSync(id){
     var A=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
     var F=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     var app=A.getApps().length?A.getApp():A.initializeApp(CFG);
-    sync.fs=F;sync.ref=F.doc(F.getFirestore(app),"rooms",id);sync.first=false;sync.last={cats:{},tx:{},goals:{}};
+    sync.fs=F;sync.ref=F.doc(F.getFirestore(app),"rooms",id);sync.first=false;sync.last=lastOf({});
     sync.unsub=F.onSnapshot(sync.ref,{includeMetadataChanges:true},onSnap,function(e){setStatus("err","Нет доступа к базе ("+(e.code||e.message)+"). Проверьте правила Firestore.")});
   }catch(e){setStatus("err","Не удалось подключиться: "+(e.message||e))}
 }
@@ -213,7 +218,7 @@ function render(){
   var bal=inc-exp;
   $("#sum").innerHTML='<div><small>Доход</small><b class="inc">'+eur.format(inc)+'</b></div><div><small>Расходы</small><b class="exp">'+eur.format(exp)+'</b></div><div><small>Остаток</small><b style="color:'+(bal<0?"var(--bad)":"inherit")+'">'+eur.format(bal)+'</b></div>';
   document.querySelectorAll("#tabs button").forEach(function(b){b.classList.toggle("on",b.dataset.t===tab)});
-  $("#view").innerHTML=tab==="limits"?vLimits(tx):tab==="tx"?vTx(tx):vGoals();
+  $("#view").innerHTML=tab==="limits"?vLimits(tx):tab==="tx"?vTx(tx):tab==="shop"?vShop():vGoals();
 }
 function vLimits(tx){
   var h='<details class="card add"><summary>＋ Новая категория</summary><form id="fcat" style="margin-top:10px"><input name="e" maxlength="4" placeholder="😊" aria-label="Смайлик" style="flex:0 0 64px;text-align:center"><input name="n" placeholder="Название, например Кафе" required><input name="l" type="number" min="0" step="1" inputmode="decimal" placeholder="Лимит, ₽" required><button class="pri">Добавить</button></form></details>';
@@ -248,6 +253,15 @@ function vTx(tx){
   });
   return h+'</div>';
 }
+function vShop(){
+  var open=S.shop.filter(function(x){return !x.done}),done=S.shop.filter(function(x){return x.done});
+  var h='<div class="card"><form id="fshop"><input name="n" placeholder="Что купить? Например, молоко, 2 шт." required maxlength="80" autocomplete="off"><button class="pri">Добавить</button></form></div>';
+  if(!S.shop.length)return h+'<div class="empty">Список пуст. Добавьте первую покупку выше.</div>';
+  function row(x){return '<div class="tx"><button class="chk'+(x.done?" on":"")+'" data-shop-tog="'+x.id+'" aria-label="Отметить купленным">'+(x.done?"✓":"")+'</button><div class="m"><div style="white-space:normal;'+(x.done?"text-decoration:line-through;color:var(--mute)":"")+'">'+esc(x.name)+'</div></div><button class="ghost" data-shop-del="'+x.id+'" aria-label="Удалить">✕</button></div>'}
+  h+='<div class="card"><div class="note" style="margin-bottom:6px">Осталось купить: '+open.length+'</div>'+open.map(row).join("")+'</div>';
+  if(done.length)h+='<div class="card"><div class="row" style="margin-bottom:6px"><span class="note">Куплено: '+done.length+'</span><button data-shop-clear="1">Убрать купленные</button></div>'+done.map(row).join("")+'</div>';
+  return h;
+}
 function vGoals(){
   var h="";
   if(!S.goals.length)h+='<div class="empty">Целей пока нет. Задайте первую: отпуск, подушка безопасности, техника.</div>';
@@ -265,7 +279,10 @@ function vGoals(){
 document.addEventListener("click",function(e){
   var b=e.target.closest("button");if(!b)return;
   if(b.id==="tbtn"){showTheme=!showTheme;return renderThemeBar()}
-  if(b.dataset.bk==="exp"){var bl=new Blob([JSON.stringify({cats:S.cats,tx:S.tx,goals:S.goals})],{type:"application/json"}),ln=document.createElement("a");ln.href=URL.createObjectURL(bl);ln.download="budget-"+today+".json";document.body.appendChild(ln);ln.click();ln.remove();return}
+  if(b.dataset.shopTog){var si=S.shop.filter(function(x){return x.id===b.dataset.shopTog})[0];if(si){si.done=!si.done;save();render()}return}
+  if(b.dataset.shopDel){S.shop=S.shop.filter(function(x){return x.id!==b.dataset.shopDel});save();return render()}
+  if(b.dataset.shopClear){S.shop=S.shop.filter(function(x){return !x.done});save();return render()}
+  if(b.dataset.bk==="exp"){var bl=new Blob([JSON.stringify({cats:S.cats,tx:S.tx,goals:S.goals,shop:S.shop})],{type:"application/json"}),ln=document.createElement("a");ln.href=URL.createObjectURL(bl);ln.download="budget-"+today+".json";document.body.appendChild(ln);ln.click();ln.remove();return}
   if(b.dataset.bk==="imp"){$("#bkfile").click();return}
   if(b.dataset.bk==="auto"){var bk=null;try{bk=JSON.parse(localStorage.getItem("budget-backup")).s}catch(x){}if(bk&&confirm("Заменить данные на этом устройстве автоматической копией?"))applyData(bk);return}
   if(b.dataset.cloud==="on"){var pi=$("#phrase");return connect(pi?pi.value:"")}
@@ -295,9 +312,11 @@ document.addEventListener("submit",function(e){
   else if(f.id==="ftx"){var cid=v("c");if(txType==="exp"&&cid==="__new"){var nm=v("nc").trim()||"Новая категория",ex=S.cats.filter(function(c){return c.name.toLowerCase()===nm.toLowerCase()})[0];if(ex){cid=ex.id}else{cid=uid();S.cats.push({id:cid,name:nm,limit:0})}}
     S.tx.push({id:uid(),type:txType,amt:parseFloat(v("a")),cat:txType==="exp"?cid:"",date:v("d"),note:v("n").trim()});
     if(v("d").slice(0,7)!==month)month=v("d").slice(0,7)}
+  else if(f.id==="fshop"){var nm2=v("n").trim();if(nm2)S.shop.push({id:uid(),name:nm2,done:false})}
   else if(f.id==="fgl"){S.goals.push({id:uid(),name:v("n").trim(),target:parseFloat(v("t")),saved:0})}
   else if(f.classList.contains("fgoal")){var g=S.goals.filter(function(x){return x.id===f.dataset.g})[0];g.saved=Math.max(0,g.saved+parseFloat(v("a")))}
   save();render();
+  if(f.id==="fshop"){var ni=document.querySelector("#fshop input");if(ni)ni.focus()}
 });
 applyTheme();applyTitle();render();
 if(room&&cfgOk())startSync(room);
