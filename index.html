@@ -76,6 +76,12 @@ nav button{padding:8px 4px;font-size:15px}
 @keyframes drive{from{left:100%}to{left:-12%}}
 @media (prefers-reduced-motion:reduce){.ee .car{animation:none;left:40%}}
 .lim{flex-wrap:wrap}
+.chipsw{display:flex;flex-wrap:wrap;gap:8px}.tc{display:inline-flex;align-items:center}
+.tc>button:first-child{border-radius:999px;padding:8px 14px}
+.wr{display:flex;align-items:center;gap:4px;background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:12px;padding:2px 4px 2px 10px;margin-bottom:8px;font-size:14px}
+.wr.over{border-left-color:var(--bad)}.wl{flex:1;text-align:left;border:0;background:none;padding:6px 0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:12px;display:flex;gap:14px;align-items:center;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.3);max-width:calc(100% - 24px)}
+.toast button{background:none;border:0;color:inherit;font-weight:700;text-decoration:underline;padding:2px 4px}
 .chips{display:flex;gap:6px}.chips button{flex:1}
 .chips button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .fl{display:flex;gap:8px}.fl select{flex:1;min-width:0}
@@ -104,6 +110,7 @@ input[type=checkbox]{width:18px;height:18px;padding:0;accent-color:var(--accent)
   <div id="themebar"></div>
   <div class="sum" id="sum"></div>
   <div class="note" id="carry" style="margin:-6px 4px 12px"></div>
+  <div id="warn"></div>
   <nav id="tabs">
     <button data-t="limits" class="on">Лимиты</button>
     <button data-t="tx">Операции</button>
@@ -123,10 +130,10 @@ var today=new Date().toISOString().slice(0,10);
 var DEF=[["Продукты",25000,"🛒"],["Кафе и рестораны",6000,"☕"],["Бензин",8000,"⛽"],["Ремонт и обслуживание авто",5000,"🔧"],["Парковка и мойка",1500,"🅿️"],["Такси и общественный транспорт",3000,"🚕"],["Жильё и коммуналка",10000,"🏠"],["Связь и интернет",1000,"📱"],["Здоровье и аптека",3000,"💊"],["Одежда и обувь",5000,"👗"],["Красота и уход",3000,"💅"],["Развлечения",5000,"🎬"],["Подписки",1000,"📺"],["Подарки",3000,"🎁"],["Прочее",3000,"✨"]];
 var S={cats:DEF.map(function(d,i){return{id:"d"+i,name:d[0],limit:d[1],emo:d[2]}}),tx:[],goals:[]};
 try{var raw=localStorage.getItem(KEY);if(raw){S=JSON.parse(raw)}}catch(e){}
-S.shop=S.shop||[];S.meta=S.meta||[];S.theme=S.theme||"mint";S.title=S.title||"Мой бюджет";
+S.shop=S.shop||[];S.meta=S.meta||[];S.tpl=S.tpl||[];S.dis=S.dis||{};S.theme=S.theme||"mint";S.title=S.title||"Мой бюджет";
 S.cats.forEach(function(c){if(c.emo===undefined){var d=DEF.filter(function(x){return x[0]===c.name})[0];c.emo=d?d[2]:""}});
 normalize();S.cats.sort(function(a,b){return(a.o||0)-(b.o||0)});
-var month=today.slice(0,7),tab="limits",txType="exp",pick="",showTheme=false,editId="";
+var month=today.slice(0,7),tab="limits",txType="exp",pick="",showTheme=false,editId="",tplEdit=false,pre=null;
 function saveLocal(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){normalize();saveLocal();syncPush()}
 var MN=["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
@@ -147,7 +154,7 @@ function cloudBox(){
   if(!cfgOk())h+='<span class="note" style="flex:1 1 100%">Не настроен: заполните файл firebase-config.js (инструкция в README).</span>';
   else if(room)h+='<span class="note" style="flex:1 1 100%">'+esc(sync.msg||"Подключаемся…")+'</span><button data-cloud="off">Отключить</button>';
   else h+='<input id="phrase" placeholder="Секретное слово или фраза" autocomplete="off"><button class="pri" data-cloud="on">Подключить</button><span class="note" style="flex:1 1 100%">'+esc(sync.msg||"Одинаковое слово на всех устройствах. Минимум 8 символов, лучше 3–4 случайных слова.")+'</span>';
-  return h+'</div>';
+  return h+'<span class="note" style="flex:1 1 100%;font-size:12px">Версия синхронизации: 2</span></div>';
 }
 function renderThemeBar(){
   $("#themebar").innerHTML=showTheme?'<div class="tb">'+THN.map(function(t){return '<button class="sw'+(S.theme===t[0]?" on":"")+'" data-th="'+t[0]+'" style="background:'+t[2]+'" aria-label="'+t[1]+'" title="'+t[1]+'"></button>'}).join("")+'<input id="ttlin" value="'+esc(S.title)+'" maxlength="30" aria-label="Название приложения" placeholder="Название приложения"></div>'+cloudBox()+bkBox():"";
@@ -155,7 +162,7 @@ function renderThemeBar(){
 function emoBtn(k,id,e){return '<button class="emo" data-pick="'+k+':'+id+'" aria-label="Выбрать смайлик">'+(e||"＋")+'</button>'}
 function grid(k,id){if(pick!==k+":"+id)return "";return '<div class="eg">'+EM.map(function(e){return '<button data-emo="'+e+'">'+e+'</button>'}).join("")+'<button data-emo="" class="ghost">Убрать</button></div>'}
 /* ---------- Общий бюджет (Firebase Firestore) ---------- */
-var CFG=window.FIREBASE_CONFIG,COLS=["cats","tx","goals","shop","meta"],room=null;
+var CFG=window.FIREBASE_CONFIG,COLS=["cats","tx","goals","shop","meta","tpl"],room=null;
 try{room=localStorage.getItem("budget-room")}catch(e){}
 var sync={fs:null,ref:null,unsub:null,first:false,last:lastOf({}),kind:"",msg:"",dirty:false};
 function lastOf(rem){var o={};COLS.forEach(function(k){o[k]=Object.assign({},rem[k]||{})});return o}
@@ -163,8 +170,8 @@ function cfgOk(){return !!(CFG&&CFG.apiKey&&CFG.projectId)}
 function ser(o){return JSON.stringify(o,Object.keys(o).sort())}
 function toMap(a){var m={};a.forEach(function(x){m[x.id]=ser(x)});return m}
 function arr(m,k){var a=[];Object.keys(m).forEach(function(id){try{a.push(JSON.parse(m[id]))}catch(e){}});if(k!=="tx")a.sort(function(x,y){return(x.o||0)-(y.o||0)});return a}
-function normalize(){var n=Date.now();["cats","goals","shop"].forEach(function(k){S[k].forEach(function(x,i){if(x.o==null)x.o=n+i})})}
-function pristine(){return !S.tx.length&&!S.goals.length&&!S.shop.length&&!S.meta.length&&S.cats.length===DEF.length&&S.cats.every(function(c,i){return c.id==="d"+i&&c.name===DEF[i][0]&&c.limit===DEF[i][1]&&c.emo===DEF[i][2]})}
+function normalize(){var n=Date.now();["cats","goals","shop","tpl"].forEach(function(k){S[k].forEach(function(x,i){if(x.o==null)x.o=n+i})})}
+function pristine(){return !S.tx.length&&!S.goals.length&&!S.shop.length&&!S.meta.length&&!S.tpl.length&&S.cats.length===DEF.length&&S.cats.every(function(c,i){return c.id==="d"+i&&c.name===DEF[i][0]&&c.limit===DEF[i][1]&&c.emo===DEF[i][2]})}
 function typing(){var a=document.activeElement;return !!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)&&$("#view").contains(a))}
 function refresh(){if(typing()){sync.dirty=true}else{sync.dirty=false;render()}}
 document.addEventListener("focusout",function(){setTimeout(function(){if(sync.dirty&&!typing())refresh()},50)});
@@ -187,33 +194,46 @@ function syncPush(){
   COLS.forEach(function(k){sync.last[k]=toMap(S[k])});
   sync.fs.setDoc(sync.ref,diff,{merge:true}).catch(function(e){setStatus("err","Не удалось отправить данные ("+(e.code||e.message)+"). Проверьте, что правила Firestore опубликованы (Publish). Синхронизация остановлена, данные на устройстве целы.");stopSync()});
 }
+function setKnown(rem){S.known={};S.knownRoom=room;COLS.forEach(function(k){S.known[k]={};Object.keys(rem[k]).forEach(function(id){S.known[k][id]=1})})}
 function onSnap(snap){
   if(!sync.first&&snap.metadata&&snap.metadata.fromCache){setStatus("wait","Нет связи с сервером, ждём подключения…");return}
   backup();
   var d=snap.exists()?snap.data():{},rem={},has=false;
   COLS.forEach(function(k){rem[k]=d[k]||{};if(Object.keys(rem[k]).length)has=true});
   if(!sync.first){
-    var take=has&&pristine();
+    /* K: что это устройство уже видело в облаке при прошлой синхронизации. Без K (первый запуск этой версии
+       или другая комната) и при непустом облаке верим облаку, чтобы старые копии не воскрешали удалённое. */
+    var K=S.knownRoom===room?S.known:null,adopt=!K&&has;
     COLS.forEach(function(k){
-      var m=Object.assign({},rem[k]);
-      if(!take)S[k].forEach(function(x){if(!(x.id in m))m[x.id]=ser(x)});
+      var m=Object.assign({},rem[k]),kk=(K&&K[k])||{},loc={};
+      S[k].forEach(function(x){
+        loc[x.id]=1;
+        if(!(x.id in m)){
+          if(adopt)return;           /* облако главное */
+          if(kk[x.id])return;        /* уже было в облаке, но кто-то удалил: не возвращаем */
+          m[x.id]=ser(x);            /* новое, созданное на этом устройстве: отправим */
+        }
+      });
+      if(K&&!adopt)Object.keys(rem[k]).forEach(function(id){if(kk[id]&&!loc[id])delete m[id]}); /* удалено здесь, пока не было связи: удалим и в облаке */
       S[k]=arr(m,k);
     });
     sync.last=lastOf(rem);
+    setKnown(rem);
     sync.first=true;saveLocal();syncPush();
   }else{
     if(!has&&S.cats.length+S.tx.length+S.goals.length>0){setStatus("err","Облако пустое, а на устройстве есть данные. Вероятно, нет прав на запись: проверьте правила Firestore. Синхронизация остановлена, данные на устройстве целы.");stopSync();return}
     COLS.forEach(function(k){S[k]=arr(rem[k],k)});
     sync.last=lastOf(rem);
+    setKnown(rem);
     saveLocal();
   }
   setStatus("ok","Подключено. Данные общие и обновляются сами.");
   refresh();
 }
 function cnt(o){return o.cats.length+o.tx.length+o.goals.length+(o.shop||[]).length}
-function backup(){try{var n=cnt(S),prev=0;try{prev=cnt(JSON.parse(localStorage.getItem("budget-backup")).s)}catch(e){}if(n>0&&n>=prev)localStorage.setItem("budget-backup",JSON.stringify({d:Date.now(),s:{cats:S.cats,tx:S.tx,goals:S.goals,shop:S.shop,meta:S.meta}}))}catch(e){}}
+function backup(){try{var n=cnt(S),prev=0;try{prev=cnt(JSON.parse(localStorage.getItem("budget-backup")).s)}catch(e){}if(n>0&&n>=prev)localStorage.setItem("budget-backup",JSON.stringify({d:Date.now(),s:{cats:S.cats,tx:S.tx,goals:S.goals,shop:S.shop,meta:S.meta,tpl:S.tpl}}))}catch(e){}}
 function hasBk(){try{return !!localStorage.getItem("budget-backup")}catch(e){return false}}
-function applyData(o){if(!o||!Array.isArray(o.cats)||!Array.isArray(o.tx)||!Array.isArray(o.goals)){alert("Файл не похож на копию бюджета");return}backup();S.cats=o.cats;S.tx=o.tx;S.goals=o.goals;S.shop=Array.isArray(o.shop)?o.shop:[];S.meta=Array.isArray(o.meta)?o.meta:[];save();render()}
+function applyData(o){if(!o||!Array.isArray(o.cats)||!Array.isArray(o.tx)||!Array.isArray(o.goals)){alert("Файл не похож на копию бюджета");return}backup();S.cats=o.cats;S.tx=o.tx;S.goals=o.goals;S.shop=Array.isArray(o.shop)?o.shop:[];S.meta=Array.isArray(o.meta)?o.meta:[];S.tpl=Array.isArray(o.tpl)?o.tpl:[];save();render()}
 function bkBox(){return '<div class="tb"><b style="flex:1 1 100%">Резервная копия</b><button data-bk="exp">Сохранить в файл</button><button data-bk="imp">Загрузить из файла</button>'+(hasBk()?'<button data-bk="auto">Восстановить авто-копию</button>':'')+'<input type="file" id="bkfile" accept=".json" style="display:none"></div>'}
 function stopSync(){if(sync.unsub){try{sync.unsub()}catch(e){}}sync.unsub=null;sync.fs=null;sync.ref=null;sync.first=false}
 async function startSync(id){
@@ -236,12 +256,63 @@ async function connect(raw){
   try{localStorage.setItem("budget-room",room)}catch(e){}
   startSync(room);
 }
+var toastT=0;
+function toast(msg,undo){
+  var old=document.querySelector(".toast");if(old)old.remove();clearTimeout(toastT);
+  var d=document.createElement("div");d.className="toast";d.setAttribute("role","status");
+  d.innerHTML='<span></span>'+(undo?'<button>Отменить</button>':'');
+  d.firstChild.textContent=msg;
+  if(undo)d.querySelector("button").addEventListener("click",function(){undo();d.remove();clearTimeout(toastT)});
+  document.body.appendChild(d);toastT=setTimeout(function(){d.remove()},7000);
+}
+function warnList(){
+  if(month!==today.slice(0,7))return [];
+  var tx=mtx(),out=[];
+  S.cats.forEach(function(c){
+    var mode=c.warn||"over";if(mode==="off"||!(c.limit>0))return;
+    var sp=tx.filter(function(t){return t.type==="exp"&&t.cat===c.id}).reduce(function(a,t){return a+t.amt},0);
+    var lvl=sp>c.limit?"over":(mode==="near"&&sp>=c.limit*0.9?"near":"");
+    if(!lvl)return;
+    var key=month+":"+c.id+":"+lvl;if(S.dis&&S.dis[key])return;
+    out.push({key:key,lvl:lvl,text:(c.emo?c.emo+" ":"")+c.name+": "+(lvl==="over"?"превышено на "+eur.format(sp-c.limit):"осталось "+eur.format(c.limit-sp)+" из "+eur.format(c.limit))});
+  });
+  return out;
+}
+function renderWarn(){
+  var w=warnList(),el=$("#warn");
+  el.innerHTML=w.slice(0,2).map(function(x){return '<div class="wr '+x.lvl+'"><button class="wl" data-gol="1">'+esc(x.text)+'</button><button class="ghost" data-dis="'+esc(x.key)+'" aria-label="Скрыть">✕</button></div>'}).join("")+(w.length>2?'<div class="note" style="margin:0 4px 8px">и ещё '+(w.length-2)+': смотрите вкладку «Лимиты»</div>':'');
+}
+function tplBar(){
+  if(!S.tpl.length)return '';
+  return '<div class="card"><div class="row" style="margin-bottom:8px"><span class="note">Быстро добавить</span><button class="ghost" data-tpl-edit="1">'+(tplEdit?"Готово":"Править")+'</button></div><div class="chipsw">'+S.tpl.map(function(t){var c=S.cats.filter(function(x){return x.id===t.cat})[0];return '<span class="tc"><button data-tpl="'+t.id+'">'+(c&&c.emo?c.emo+" ":"")+esc(t.name)+(t.amt?" · "+eur.format(t.amt):"")+'</button>'+(tplEdit?'<button class="ghost" data-tpl-del="'+t.id+'" aria-label="Удалить шаблон">✕</button>':'')+'</span>'}).join("")+'</div></div>';
+}
+function saveTpl(){
+  var f=document.querySelector("#ftx");if(!f)return;
+  var type=txType,amt=parseFloat(f.elements.a.value)||0,cat=type==="exp"?f.elements.c.value:"",note=f.elements.n.value.trim();
+  if(cat==="__new"){alert("Сначала выберите существующую категорию или создайте её на вкладке «Лимиты».");return}
+  var c=S.cats.filter(function(x){return x.id===cat})[0],name=note||(type==="inc"?"Доход":(c?c.name:"Расход"));
+  var ex=S.tpl.filter(function(t){return t.type===type&&t.cat===cat&&t.name===name})[0];
+  if(ex){ex.amt=amt;ex.note=note}else S.tpl.push({id:uid(),name:name,type:type,cat:cat,amt:amt,note:note,o:Date.now()});
+  save();render();toast("Шаблон «"+name+"» сохранён"+(amt?"":". Сумму вы вводите при каждом добавлении"));
+}
+function useTpl(id){
+  var t=S.tpl.filter(function(x){return x.id===id})[0];if(!t)return;
+  if(t.amt>0&&S.me){
+    var rec={id:uid(),type:t.type,amt:t.amt,cat:t.type==="exp"?t.cat:"",date:today,note:t.note||"",who:S.me};
+    S.tx.push(rec);month=today.slice(0,7);save();render();
+    toast("Добавлено: "+t.name+" "+(t.type==="inc"?"+":"−")+eur.format(t.amt),function(){S.tx=S.tx.filter(function(x){return x.id!==rec.id});save();render()});
+  }else{
+    txType=t.type;pre={cat:t.cat,note:t.note||"",amt:0};editId="";render();
+    var a=document.querySelector("#ftx input[name=a]");if(a){a.focus();if(a.scrollIntoView)a.scrollIntoView({block:"center"})}
+  }
+}
 function render(){
   var p=month.split("-");$("#mlabel").textContent=MN[+p[1]-1]+" "+p[0];
   var tx=mtx(),inc=0,exp=0;
   tx.forEach(function(t){t.type==="inc"?inc+=t.amt:exp+=t.amt});
   var carry=S.tx.filter(function(t){return t.date.slice(0,7)<month}).reduce(function(a,t){return a+(t.type==="inc"?t.amt:-t.amt)},0);
   var bal=carry+inc-exp;
+  renderWarn();
   $("#carry").textContent=carry!==0?"В остаток входит перенос с прошлых месяцев: "+(carry>0?"+":"−")+eur.format(Math.abs(carry)):"";
   $("#sum").innerHTML='<div><small>Доход</small><b class="inc">'+eur.format(inc)+'</b></div><div><small>Расходы</small><b class="exp">'+eur.format(exp)+'</b></div><div><small>Остаток</small><b style="color:'+(bal<0?"var(--bad)":"inherit")+'">'+eur.format(bal)+'</b></div>';
   document.querySelectorAll("#tabs button").forEach(function(b){b.classList.toggle("on",b.dataset.t===tab)});
@@ -279,7 +350,9 @@ function fitLimits(){
   nl.forEach(function(x,i){if(x>nl[bi])bi=i});nl[bi]=Math.max(0,nl[bi]+diff);
   var after=fixedSum+nl.reduce(function(a,x){return a+x},0);
   if(!confirm("Лимиты будут пересчитаны: сумма "+eur.format(P.total)+" → "+eur.format(after)+". Категории с галочкой «фиксированный» не меняются. Продолжить?"))return;
+  var old=flex.map(function(c){return[c.id,c.limit]});
   flex.forEach(function(c,i){c.limit=nl[i]});save();render();
+  toast("Лимиты пересчитаны",function(){old.forEach(function(p){var c=S.cats.filter(function(x){return x.id===p[0]})[0];if(c)c.limit=p[1]});save();render()});
 }
 function moveCat(id,d){var i=S.cats.findIndex(function(x){return x.id===id}),j=i+d;if(i<0||j<0||j>=S.cats.length)return;var a=S.cats[i],b=S.cats[j];S.cats[i]=b;S.cats[j]=a;var t=a.o;a.o=b.o;b.o=t;if(a.o===b.o)S.cats.forEach(function(c,k){c.o=(k+1)*1000});save();render()}
 function vLimits(tx){
@@ -299,7 +372,7 @@ function vLimits(tx){
       +grid("cat",c.id)+'<div class="big">'+eur.format(sp)+' <span class="note" style="font-size:15px;font-weight:400">из '+eur.format(c.limit)+'</span></div>'
       +'<div class="bar"><i style="width:'+Math.min(pct,100)+'%"></i></div>'
       +'<div class="row"><span>'+msg+'</span><span class="note">'+Math.round(pct)+'%</span></div>'
-      +'<div class="lim"><label class="note" for="l'+c.id+'">Лимит на месяц</label><input id="l'+c.id+'" type="number" min="0" step="1" inputmode="decimal" value="'+c.limit+'" data-lim="'+c.id+'"><label class="note" style="display:flex;align-items:center;gap:6px;margin-left:auto"><input type="checkbox" data-fix="'+c.id+'"'+(c.fix?" checked":"")+'> фиксированный</label></div></div>';
+      +'<div class="lim"><label class="note" for="l'+c.id+'">Лимит на месяц</label><input id="l'+c.id+'" type="number" min="0" step="1" inputmode="decimal" value="'+c.limit+'" data-lim="'+c.id+'"><label class="note" style="display:flex;align-items:center;gap:6px;margin-left:auto"><input type="checkbox" data-fix="'+c.id+'"'+(c.fix?" checked":"")+'> фиксированный</label></div><div class="lim"><label class="note" for="w'+c.id+'">Предупреждения</label><select id="w'+c.id+'" data-warn="'+c.id+'"><option value="over"'+((c.warn||"over")==="over"?" selected":"")+'>только при превышении</option><option value="near"'+(c.warn==="near"?" selected":"")+'>и когда осталось 10%</option><option value="off"'+(c.warn==="off"?" selected":"")+'>не показывать</option></select></div></div>';
   });
   return h+planCard(P);
 }
@@ -307,14 +380,15 @@ var PEOPLE=["Никита","Полина"];
 function vTx(tx){
   var ed=editId?S.tx.filter(function(x){return x.id===editId})[0]:null;
   if(editId&&!ed)editId="";
+  var pf=ed||pre;
   var who=(ed&&ed.who)||S.me||PEOPLE[0];
-  var opts=S.cats.map(function(c){return '<option value="'+c.id+'"'+(ed&&ed.cat===c.id?" selected":"")+'>'+(c.emo?c.emo+" ":"")+esc(c.name)+'</option>'}).join("");
-  var h='<div class="card">'+(ed?'<div class="name" style="margin-bottom:8px">Редактирование операции</div>':'')+'<form id="ftx"><div class="seg"><button type="button" data-ty="exp" class="'+(txType==="exp"?"on":"")+'">Расход</button><button type="button" data-ty="inc" class="'+(txType==="inc"?"on":"")+'">Доход</button></div>'
+  var opts=S.cats.map(function(c){return '<option value="'+c.id+'"'+(pf&&pf.cat===c.id?" selected":"")+'>'+(c.emo?c.emo+" ":"")+esc(c.name)+'</option>'}).join("");
+  var h=tplBar()+'<div class="card">'+(ed?'<div class="name" style="margin-bottom:8px">Редактирование операции</div>':'')+'<form id="ftx"><div class="seg"><button type="button" data-ty="exp" class="'+(txType==="exp"?"on":"")+'">Расход</button><button type="button" data-ty="inc" class="'+(txType==="inc"?"on":"")+'">Доход</button></div>'
    +'<div class="seg">'+PEOPLE.map(function(n){return '<button type="button" data-who="'+n+'" class="'+(n===who?"on":"")+'">'+n+'</button>'}).join("")+'</div><input type="hidden" name="w" value="'+esc(who)+'">'
    +'<input name="a" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Сумма, ₽" value="'+(ed?ed.amt:"")+'" required>'
    +(txType==="exp"?'<select name="c" aria-label="Категория">'+opts+'<option value="__new">＋ Новая категория…</option></select><input name="nc" placeholder="Название новой категории" style="display:'+(S.cats.length?'none':'')+'">':'')
-   +'<input name="n" placeholder="Заметка (необязательно)" value="'+(ed?esc(ed.note||""):"")+'"><input name="d" type="date" value="'+(ed?ed.date:(today.slice(0,7)===month?today:month+"-01"))+'" required>'
-   +'<button class="pri" style="flex:1 1 100%">'+(ed?"Сохранить":"Добавить")+'</button>'+(ed?'<button type="button" data-edit-cancel="1" style="flex:1 1 100%">Отмена</button>':'')+'</form></div>';
+   +'<input name="n" placeholder="Заметка (необязательно)" value="'+(pf?esc(pf.note||""):"")+'"><input name="d" type="date" value="'+(ed?ed.date:(today.slice(0,7)===month?today:month+"-01"))+'" required>'
+   +'<button class="pri" style="flex:1 1 100%">'+(ed?"Сохранить":"Добавить")+'</button>'+(ed?'<button type="button" data-edit-cancel="1" style="flex:1 1 100%">Отмена</button>':'')+(!ed?'<button type="button" data-tpl-save="1" style="flex:1 1 100%">★ Сохранить как шаблон</button>':'')+'</form></div>';
   var ppl=PEOPLE.slice();if(S.tx.some(function(t){return !t.who&&t.date.slice(0,7)<=month}))ppl.push("");
   if(S.tx.length)h+='<div class="card"><div class="note" style="margin-bottom:4px">Кто сколько внёс и сколько осталось денег</div>'+ppl.map(function(n){
     var i=0,e=0,cr=0;
@@ -382,15 +456,21 @@ document.addEventListener("click",function(e){
   if(b.id==="tbtn"){showTheme=!showTheme;return renderThemeBar()}
   if(b.dataset.ft!==undefined){fType=b.dataset.ft;return render()}
   if(b.dataset.fclear){fType="";fWho="";fCat="";fQ="";return render()}
+  if(b.dataset.tpl){return useTpl(b.dataset.tpl)}
+  if(b.dataset.tplEdit){tplEdit=!tplEdit;return render()}
+  if(b.dataset.tplSave){return saveTpl()}
+  if(b.dataset.tplDel){var tr=S.tpl.filter(function(t){return t.id===b.dataset.tplDel})[0];S.tpl=S.tpl.filter(function(t){return t.id!==b.dataset.tplDel});save();render();if(tr)toast("Шаблон удалён",function(){S.tpl.push(tr);save();render()});return}
+  if(b.dataset.dis){S.dis=S.dis||{};S.dis[b.dataset.dis]=1;saveLocal();return renderWarn()}
+  if(b.dataset.gol){tab="limits";return render()}
   if(b.dataset.fit){return fitLimits()}
   if(b.dataset.mv){var pr=b.dataset.mv.split(":");moveCat(pr[0],+pr[1]);return}
   if(b.dataset.who){S.me=b.dataset.who;saveLocal();document.querySelectorAll("[data-who]").forEach(function(x){x.classList.toggle("on",x===b)});var hw=document.querySelector("#ftx input[name=w]");if(hw)hw.value=S.me;return}
   if(b.dataset.editTx){var et=S.tx.filter(function(x){return x.id===b.dataset.editTx})[0];if(et){editId=et.id;txType=et.type;tab="tx";render();window.scrollTo(0,0)}return}
-  if(b.dataset.editCancel){editId="";return render()}
+  if(b.dataset.editCancel){editId="";pre=null;return render()}
   if(b.dataset.shopTog){var si=S.shop.filter(function(x){return x.id===b.dataset.shopTog})[0];if(si){si.done=!si.done;save();render()}return}
-  if(b.dataset.shopDel){S.shop=S.shop.filter(function(x){return x.id!==b.dataset.shopDel});save();return render()}
-  if(b.dataset.shopClear){S.shop=S.shop.filter(function(x){return !x.done});save();return render()}
-  if(b.dataset.bk==="exp"){var bl=new Blob([JSON.stringify({cats:S.cats,tx:S.tx,goals:S.goals,shop:S.shop,meta:S.meta})],{type:"application/json"}),ln=document.createElement("a");ln.href=URL.createObjectURL(bl);ln.download="budget-"+today+".json";document.body.appendChild(ln);ln.click();ln.remove();return}
+  if(b.dataset.shopDel){var rs=S.shop.filter(function(x){return x.id===b.dataset.shopDel})[0];S.shop=S.shop.filter(function(x){return x.id!==b.dataset.shopDel});save();render();if(rs)toast("Удалено: "+rs.name,function(){S.shop.push(rs);save();render()});return}
+  if(b.dataset.shopClear){var rd=S.shop.filter(function(x){return x.done});S.shop=S.shop.filter(function(x){return !x.done});save();render();toast("Убрано купленных: "+rd.length,function(){rd.forEach(function(x){S.shop.push(x)});save();render()});return}
+  if(b.dataset.bk==="exp"){var bl=new Blob([JSON.stringify({cats:S.cats,tx:S.tx,goals:S.goals,shop:S.shop,meta:S.meta,tpl:S.tpl})],{type:"application/json"}),ln=document.createElement("a");ln.href=URL.createObjectURL(bl);ln.download="budget-"+today+".json";document.body.appendChild(ln);ln.click();ln.remove();return}
   if(b.dataset.bk==="imp"){$("#bkfile").click();return}
   if(b.dataset.bk==="auto"){var bk=null;try{bk=JSON.parse(localStorage.getItem("budget-backup")).s}catch(x){}if(bk&&confirm("Заменить данные на этом устройстве автоматической копией?"))applyData(bk);return}
   if(b.dataset.cloud==="on"){var pi=$("#phrase");return connect(pi?pi.value:"")}
@@ -400,11 +480,11 @@ document.addEventListener("click",function(e){
   if(b.dataset.emo!==undefined){var pp=pick.split(":"),arr=pp[0]==="cat"?S.cats:S.goals,it=arr.filter(function(x){return x.id===pp[1]})[0];if(it)it.emo=b.dataset.emo;pick="";save();return render()}
   if(b.id==="prev")return shift(-1);
   if(b.id==="next")return shift(1);
-  if(b.dataset.t){tab=b.dataset.t;editId="";return render()}
+  if(b.dataset.t){tab=b.dataset.t;editId="";pre=null;return render()}
   if(b.dataset.ty){txType=b.dataset.ty;return render()}
-  if(b.dataset.delCat){if(confirm("Удалить категорию? Её операции останутся без категории.")){S.cats=S.cats.filter(function(c){return c.id!==b.dataset.delCat});save();render()}return}
-  if(b.dataset.delTx){S.tx=S.tx.filter(function(t){return t.id!==b.dataset.delTx});save();return render()}
-  if(b.dataset.delGoal){if(confirm("Удалить цель?")){S.goals=S.goals.filter(function(g){return g.id!==b.dataset.delGoal});save();render()}}
+  if(b.dataset.delCat){var rc=S.cats.filter(function(c){return c.id===b.dataset.delCat})[0];S.cats=S.cats.filter(function(c){return c.id!==b.dataset.delCat});save();render();if(rc)toast("Категория «"+rc.name+"» удалена",function(){S.cats.push(rc);S.cats.sort(function(a,b){return(a.o||0)-(b.o||0)});save();render()});return}
+  if(b.dataset.delTx){var rt=S.tx.filter(function(t){return t.id===b.dataset.delTx})[0];S.tx=S.tx.filter(function(t){return t.id!==b.dataset.delTx});save();render();if(rt)toast("Операция удалена",function(){S.tx.push(rt);save();render()});return}
+  if(b.dataset.delGoal){var rg=S.goals.filter(function(g){return g.id===b.dataset.delGoal})[0];S.goals=S.goals.filter(function(g){return g.id!==b.dataset.delGoal});save();render();if(rg)toast("Цель «"+rg.name+"» удалена",function(){S.goals.push(rg);S.goals.sort(function(a,b){return(a.o||0)-(b.o||0)});save();render()});return}
 });
 document.addEventListener("change",function(e){
   var i=e.target;if(i.id==="fwho"){fWho=i.value;return refreshHist()}
@@ -412,6 +492,7 @@ document.addEventListener("change",function(e){
   if(i.id==="planin"){return setPlan({v:Math.max(0,parseFloat(i.value)||0)})}
   if(i.id==="resin"){return setPlan({res:Math.min(50,Math.max(0,parseFloat(i.value)||0))})}
   if(i.id==="pmode"){return setPlan({mode:i.value})}
+  if(i.dataset.warn){var wc=S.cats.filter(function(x){return x.id===i.dataset.warn})[0];if(wc){wc.warn=i.value;save();render()}return}
   if(i.dataset.fix){var fc=S.cats.filter(function(x){return x.id===i.dataset.fix})[0];if(fc){fc.fix=i.checked;save();render()}return}
   if(i.id==="bkfile"){var fl=i.files[0];if(!fl)return;var rd=new FileReader();rd.onload=function(){try{var o=JSON.parse(rd.result);if(confirm("Заменить данные на этом устройстве данными из файла?"))applyData(o)}catch(x){alert("Не удалось прочитать файл")}};rd.readAsText(fl);i.value="";return}
   if(i.id==="ttlin"){S.title=i.value.trim()||"Мой бюджет";save();applyTitle();return}
@@ -426,8 +507,10 @@ document.addEventListener("submit",function(e){
   else if(f.id==="ftx"){var cid=v("c");if(txType==="exp"&&cid==="__new"){var nm=v("nc").trim()||"Новая категория",ex=S.cats.filter(function(c){return c.name.toLowerCase()===nm.toLowerCase()})[0];if(ex){cid=ex.id}else{cid=uid();S.cats.push({id:cid,name:nm,limit:0})}}
     var rec={type:txType,amt:parseFloat(v("a")),cat:txType==="exp"?cid:"",date:v("d"),note:v("n").trim(),who:v("w")};
     var ex2=editId?S.tx.filter(function(x){return x.id===editId})[0]:null;
+    var oldc=ex2?Object.assign({},ex2):null;
     if(ex2){Object.assign(ex2,rec)}else{rec.id=uid();S.tx.push(rec)}
-    editId="";
+    editId="";pre=null;S.me=v("w");
+    if(oldc)toast("Операция изменена",function(){var x=S.tx.filter(function(y){return y.id===oldc.id})[0];if(x){Object.assign(x,oldc);save();render()}});
     if(v("d").slice(0,7)!==month)month=v("d").slice(0,7)}
   else if(f.id==="fshop"){var nm2=v("n").trim();if(nm2)S.shop.push({id:uid(),name:nm2,done:false})}
   else if(f.id==="fgl"){S.goals.push({id:uid(),name:v("n").trim(),target:parseFloat(v("t")),saved:0})}
