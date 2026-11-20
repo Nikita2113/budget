@@ -75,6 +75,8 @@ nav button{padding:8px 4px;font-size:15px}
 .ee .car{position:absolute;top:0;left:-10%;white-space:nowrap;animation:drive 4s linear infinite}
 @keyframes drive{from{left:100%}to{left:-12%}}
 @media (prefers-reduced-motion:reduce){.ee .car{animation:none;left:40%}}
+.lim{flex-wrap:wrap}
+input[type=checkbox]{width:18px;height:18px;padding:0;accent-color:var(--accent)}
 .gal{display:grid;grid-template-columns:1fr;gap:8px;margin:12px 0}
 @media (min-width:520px){.gal{grid-template-columns:1fr 1fr}}
 .gal img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;display:block;background:var(--track)}
@@ -241,16 +243,48 @@ function render(){
   document.querySelectorAll("#tabs button").forEach(function(b){b.classList.toggle("on",b.dataset.t===tab)});
   $("#view").innerHTML=tab==="limits"?vLimits(tx):tab==="tx"?vTx(tx):tab==="shop"?vShop():vGoals();
 }
+function avg3(){var p=month.split("-"),vals=[];for(var k=1;k<=3;k++){var d=new Date(+p[0],+p[1]-1-k,1),key=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"),sum=S.tx.filter(function(t){return t.type==="inc"&&t.date.slice(0,7)===key}).reduce(function(a,t){return a+t.amt},0);if(sum>0)vals.push(sum)}return vals.length?Math.round(vals.reduce(function(a,x){return a+x},0)/vals.length):0}
+function planInfo(tx){
+  var total=S.cats.reduce(function(a,c){return a+(c.limit||0)},0),pl=S.meta.filter(function(x){return x.id==="plan"})[0]||{},plan=pl.v||0,res=pl.res||0,mode=pl.mode||(plan>0?"manual":"actual");
+  var inc=tx.filter(function(t){return t.type==="inc"}).reduce(function(a,t){return a+t.amt},0),avg=avg3();
+  var base=mode==="manual"?plan:mode==="avg"?avg:inc,usable=Math.round(base*(1-res/100));
+  return{total:total,plan:plan,res:res,mode:mode,inc:inc,avg:avg,base:base,usable:usable,free:usable-total};
+}
+function setPlan(o){var pm=S.meta.filter(function(x){return x.id==="plan"})[0];if(!pm){pm={id:"plan"};S.meta.push(pm)}Object.assign(pm,o);save();render()}
+function planCard(P){
+  var cls=P.usable>0&&P.total>P.usable?"st-bad":"";
+  return '<div class="card '+cls+'"><div class="name" style="margin-bottom:8px">Планирование лимитов</div>'
+   +'<div class="row"><span>Сумма всех лимитов</span><b>'+eur.format(P.total)+'</b></div>'
+   +'<div class="lim"><label class="note" for="pmode">Доход для расчёта</label><select id="pmode"><option value="manual"'+(P.mode==="manual"?" selected":"")+'>Ожидаемый, вручную</option><option value="avg"'+(P.mode==="avg"?" selected":"")+'>Средний за 3 мес. ('+eur.format(P.avg)+')</option><option value="actual"'+(P.mode==="actual"?" selected":"")+'>Фактический за месяц ('+eur.format(P.inc)+')</option></select></div>'
+   +(P.mode==="manual"?'<div class="lim"><label class="note" for="planin">Ожидаемый доход, ₽</label><input id="planin" type="number" min="0" step="100" inputmode="decimal" value="'+(P.plan||"")+'" placeholder="например 120000"></div>':'')
+   +'<div class="lim"><label class="note" for="resin">Резерв, % (не распределять)</label><input id="resin" type="number" min="0" max="50" step="1" inputmode="decimal" value="'+(P.res||"")+'" placeholder="0"></div>'
+   +'<div class="row" style="margin-top:8px"><span>Можно распределить</span><b>'+eur.format(P.usable)+'</b></div>'
+   +'<div class="row"><span>'+(P.free>=0?'Не распределено':'Лимиты больше на')+'</span><b style="color:'+(P.free<0?"var(--bad)":"inherit")+'">'+eur.format(Math.abs(P.free))+'</b></div>'
+   +'<button class="pri" data-fit="1" style="width:100%;margin-top:10px">Подогнать лимиты под доход</button>'
+   +'<div class="note" style="margin-top:6px">Категории с галочкой «фиксированный» не меняются. Остальные меняются пропорционально.</div></div>';
+}
+function fitLimits(){
+  var P=planInfo(mtx());
+  if(P.usable<=0){alert("Сначала укажите доход для расчёта.");return}
+  var fixed=S.cats.filter(function(c){return c.fix}),flex=S.cats.filter(function(c){return !c.fix});
+  var fixedSum=fixed.reduce(function(a,c){return a+(c.limit||0)},0),flexSum=flex.reduce(function(a,c){return a+(c.limit||0)},0),room=P.usable-fixedSum;
+  if(room<=0){alert("Фиксированные лимиты ("+eur.format(fixedSum)+") уже не меньше дохода для расчёта ("+eur.format(P.usable)+"). Уменьшите их вручную.");return}
+  if(flexSum<=0){alert("Нет категорий с лимитом, которые можно менять.");return}
+  var k=room/flexSum,nl=flex.map(function(c){return Math.round((c.limit||0)*k/100)*100});
+  var diff=Math.round(room/100)*100-nl.reduce(function(a,x){return a+x},0),bi=0;
+  nl.forEach(function(x,i){if(x>nl[bi])bi=i});nl[bi]=Math.max(0,nl[bi]+diff);
+  var after=fixedSum+nl.reduce(function(a,x){return a+x},0);
+  if(!confirm("Лимиты будут пересчитаны: сумма "+eur.format(P.total)+" → "+eur.format(after)+". Категории с галочкой «фиксированный» не меняются. Продолжить?"))return;
+  flex.forEach(function(c,i){c.limit=nl[i]});save();render();
+}
 function moveCat(id,d){var i=S.cats.findIndex(function(x){return x.id===id}),j=i+d;if(i<0||j<0||j>=S.cats.length)return;var a=S.cats[i],b=S.cats[j];S.cats[i]=b;S.cats[j]=a;var t=a.o;a.o=b.o;b.o=t;if(a.o===b.o)S.cats.forEach(function(c,k){c.o=(k+1)*1000});save();render()}
 function vLimits(tx){
   var h='<details class="card add"><summary>＋ Новая категория</summary><form id="fcat" style="margin-top:10px"><input name="e" maxlength="4" placeholder="😊" aria-label="Смайлик" style="flex:0 0 64px;text-align:center"><input name="n" placeholder="Название, например Кафе" required><input name="l" type="number" min="0" step="1" inputmode="decimal" placeholder="Лимит, ₽" required><button class="pri">Добавить</button></form></details>';
-  var total=S.cats.reduce(function(a,c){return a+(c.limit||0)},0),pl=S.meta.filter(function(x){return x.id==="plan"})[0],plan=pl?pl.v:0;
-  var inc=tx.filter(function(t){return t.type==="inc"}).reduce(function(a,t){return a+t.amt},0);
-  var basis=plan>0?plan:inc,free=basis-total,tp=basis>0?total/basis*100:(total>0?100:0),tcls=tp>100?"st-bad":tp>=90?"st-warn":"";
-  h='<div class="card '+tcls+'"><div class="note">Если потратить все лимиты</div><div class="big">'+eur.format(total)+' <span class="note" style="font-size:15px;font-weight:400">в месяц</span></div><div class="bar"><i style="width:'+Math.min(tp,100)+'%"></i></div>'
-   +'<div class="row"><span>'+(basis>0?(free>=0?'Останется свободным <b>'+eur.format(free)+'</b>':'<span class="over">Лимиты больше дохода на '+eur.format(-free)+'</span>'):'Укажите доход, чтобы сравнить')+'</span><span class="note">'+Math.round(tp)+'% дохода</span></div>'
-   +'<div class="lim"><label class="note" for="planin">Ожидаемый доход в месяц</label><input id="planin" type="number" min="0" step="100" inputmode="decimal" value="'+(plan||"")+'" placeholder="'+(inc?"по факту "+inc:"например 120000")+'"></div>'
-   +'<div class="note" style="margin-top:6px">'+(plan>0?"Сравниваем с ожидаемым доходом.":"Сравниваем с фактическим доходом за месяц ("+eur.format(inc)+").")+'</div></div>'+h;
+  var P=planInfo(tx);
+  var spentAll=tx.filter(function(t){return t.type==="exp"&&S.cats.some(function(c){return c.id===t.cat})}).reduce(function(a,t){return a+t.amt},0);
+  var lf=P.total-spentAll,sp2=P.total>0?spentAll/P.total*100:(spentAll>0?100:0),scls=sp2>100?"st-bad":sp2>=80?"st-warn":"";
+  h='<div class="card '+scls+'"><div class="note">Потрачено из лимитов</div><div class="big">'+eur.format(spentAll)+' <span class="note" style="font-size:15px;font-weight:400">из '+eur.format(P.total)+'</span></div><div class="bar"><i style="width:'+Math.min(sp2,100)+'%"></i></div>'
+   +'<div class="row"><span>'+(lf>=0?'Осталось <b>'+eur.format(lf)+'</b>':'<span class="over">Превышено на '+eur.format(-lf)+'</span>')+'</span><span class="note">'+Math.round(sp2)+'%</span></div></div>'+h;
   if(!S.cats.length)h+='<div class="empty">Добавьте первую категорию с лимитом.</div>';
   S.cats.forEach(function(c,ix){
     var sp=tx.filter(function(t){return t.type==="exp"&&t.cat===c.id}).reduce(function(a,t){return a+t.amt},0);
@@ -261,9 +295,9 @@ function vLimits(tx){
       +grid("cat",c.id)+'<div class="big">'+eur.format(sp)+' <span class="note" style="font-size:15px;font-weight:400">из '+eur.format(c.limit)+'</span></div>'
       +'<div class="bar"><i style="width:'+Math.min(pct,100)+'%"></i></div>'
       +'<div class="row"><span>'+msg+'</span><span class="note">'+Math.round(pct)+'%</span></div>'
-      +'<div class="lim"><label class="note" for="l'+c.id+'">Лимит на месяц</label><input id="l'+c.id+'" type="number" min="0" step="1" inputmode="decimal" value="'+c.limit+'" data-lim="'+c.id+'"></div></div>';
+      +'<div class="lim"><label class="note" for="l'+c.id+'">Лимит на месяц</label><input id="l'+c.id+'" type="number" min="0" step="1" inputmode="decimal" value="'+c.limit+'" data-lim="'+c.id+'"><label class="note" style="display:flex;align-items:center;gap:6px;margin-left:auto"><input type="checkbox" data-fix="'+c.id+'"'+(c.fix?" checked":"")+'> фиксированный</label></div></div>';
   });
-  return h;
+  return h+planCard(P);
 }
 var PEOPLE=["Никита","Полина"];
 function vTx(tx){
@@ -319,6 +353,7 @@ function vGoals(){
 document.addEventListener("click",function(e){
   var b=e.target.closest("button");if(!b)return;
   if(b.id==="tbtn"){showTheme=!showTheme;return renderThemeBar()}
+  if(b.dataset.fit){return fitLimits()}
   if(b.dataset.mv){var pr=b.dataset.mv.split(":");moveCat(pr[0],+pr[1]);return}
   if(b.dataset.who){S.me=b.dataset.who;saveLocal();document.querySelectorAll("[data-who]").forEach(function(x){x.classList.toggle("on",x===b)});var hw=document.querySelector("#ftx input[name=w]");if(hw)hw.value=S.me;return}
   if(b.dataset.editTx){var et=S.tx.filter(function(x){return x.id===b.dataset.editTx})[0];if(et){editId=et.id;txType=et.type;tab="tx";render();window.scrollTo(0,0)}return}
@@ -343,7 +378,10 @@ document.addEventListener("click",function(e){
   if(b.dataset.delGoal){if(confirm("Удалить цель?")){S.goals=S.goals.filter(function(g){return g.id!==b.dataset.delGoal});save();render()}}
 });
 document.addEventListener("change",function(e){
-  var i=e.target;if(i.id==="planin"){var pv=Math.max(0,parseFloat(i.value)||0),pm=S.meta.filter(function(x){return x.id==="plan"})[0];if(pm)pm.v=pv;else S.meta.push({id:"plan",v:pv});save();render();return}
+  var i=e.target;if(i.id==="planin"){return setPlan({v:Math.max(0,parseFloat(i.value)||0)})}
+  if(i.id==="resin"){return setPlan({res:Math.min(50,Math.max(0,parseFloat(i.value)||0))})}
+  if(i.id==="pmode"){return setPlan({mode:i.value})}
+  if(i.dataset.fix){var fc=S.cats.filter(function(x){return x.id===i.dataset.fix})[0];if(fc){fc.fix=i.checked;save();render()}return}
   if(i.id==="bkfile"){var fl=i.files[0];if(!fl)return;var rd=new FileReader();rd.onload=function(){try{var o=JSON.parse(rd.result);if(confirm("Заменить данные на этом устройстве данными из файла?"))applyData(o)}catch(x){alert("Не удалось прочитать файл")}};rd.readAsText(fl);i.value="";return}
   if(i.id==="ttlin"){S.title=i.value.trim()||"Мой бюджет";save();applyTitle();return}
   if(i.name==="c"&&i.form&&i.form.id==="ftx"){i.form.elements.nc.style.display=i.value==="__new"?"":"none";return}
